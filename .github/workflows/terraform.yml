@@ -1,4 +1,4 @@
-name: Terraform CI using Vault (OIDC)
+name: Terraform CI using Vault (GitHub OIDC)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  id-token: write
+  id-token: write     # REQUIRED for GitHub OIDC
   contents: read
 
 jobs:
@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout code
-      - name: Checkout repository
+      # 1. Checkout repository
+      - name: Checkout source code
         uses: actions/checkout@v4
 
-      # 2. Install Vault CLI
+      # 2. Install Vault CLI (official binary)
       - name: Install Vault CLI
         run: |
           VAULT_VERSION=1.15.6
@@ -27,31 +27,32 @@ jobs:
           sudo mv vault /usr/local/bin/
           vault version
 
-      # 3. Authenticate to Vault (NON-INTERACTIVE, CORRECT WAY)
+      # 3. Authenticate to Vault using GitHub OIDC (JWT auth backend)
+      # OFFICIAL METHOD: vault write auth/jwt/login
       - name: Authenticate to Vault
         env:
           VAULT_ADDR: http://98.82.141.249:8200
         run: |
-          VAULT_TOKEN=$(vault write -field=token auth/oidc/login \
+          VAULT_TOKEN=$(vault write -field=token auth/jwt/login \
             role=github-actions \
             jwt=$ACTIONS_ID_TOKEN_REQUEST_TOKEN)
           echo "VAULT_TOKEN=$VAULT_TOKEN" >> $GITHUB_ENV
 
-      # 4. Fetch AWS credentials from Vault
-      - name: Get AWS credentials
+      # 4. Read AWS credentials from Vault (KV v2)
+      - name: Read AWS credentials from Vault
         env:
           VAULT_ADDR: http://98.82.141.249:8200
         run: |
           echo "TF_VAR_aws_access_key=$(vault kv get -field=access_key kv/aws)" >> $GITHUB_ENV
           echo "TF_VAR_aws_secret_key=$(vault kv get -field=secret_key kv/aws)" >> $GITHUB_ENV
 
-      # 5. Setup Terraform
+      # 5. Install Terraform (pinned version)
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.14.4"
 
-      # 6. Terraform Init & Apply
+      # 6. Terraform Init & Apply (terraform folder)
       - name: Terraform Apply
         working-directory: terraform
         run: |
