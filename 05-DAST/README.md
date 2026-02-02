@@ -237,7 +237,7 @@ kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/
 Wait until ready:
 
 ```
-kubectl get pods -n calico-system
+kubectl get pods -n kube-system
 ```
 
 ---
